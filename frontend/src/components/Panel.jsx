@@ -1,0 +1,1 @@
+export default function Panel({ title, children }) { return <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6"><h2 className="mb-5 font-bold text-slate-800">{title}</h2>{children}</section> }

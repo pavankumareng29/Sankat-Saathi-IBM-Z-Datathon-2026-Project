@@ -1,0 +1,2 @@
+import { MapPin } from 'lucide-react'
+export default function PageHeader({ title, subtitle, children }) { return <section className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><div className="mb-2 flex items-center gap-2 text-sm font-medium text-sky-700"><MapPin size={16}/> Hyderabad flood response</div><h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">{title}</h1><p className="mt-2 text-slate-500">{subtitle}</p></div>{children}</section> }
