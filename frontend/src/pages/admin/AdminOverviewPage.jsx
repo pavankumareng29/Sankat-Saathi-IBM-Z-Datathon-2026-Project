@@ -1,5 +1,5 @@
 import { Activity, Building2, MapPin, Users } from 'lucide-react'
-import { AdminMetric, AdminPageHeader, AdminPanel, DemoNotice, StatusTag, tableClass, tableHeadClass, tableRowClass } from './AdminComponents'
+import { AdminMetric, AdminPageHeader, AdminPanel, StatusTag, tableClass, tableHeadClass, tableRowClass } from './AdminComponents'
 
 export default function AdminOverviewPage({ data }) {
   const stats = data?.stats || []
@@ -49,7 +49,6 @@ export default function AdminOverviewPage({ data }) {
           {requests.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No requests to display.</p>}
         </div>
       </AdminPanel>
-      <DemoNotice />
     </>
   )
 }

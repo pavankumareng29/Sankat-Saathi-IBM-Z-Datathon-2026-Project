@@ -3,7 +3,6 @@ import {
   ArrowRight,
   Building2,
   CircleCheck,
-  Droplets,
   Eye,
   EyeOff,
   KeyRound,
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { requestPasswordReset, validatePassword } from '../services/authApi'
+import BrandLogo from '../components/BrandLogo'
 
 /* ------------------------------------------------------------------ */
 /*  Theme styles: storm scene (rain, lightning, waves, motion)         */
@@ -40,6 +40,10 @@ const THEME_CSS = `
   50% { transform: translateY(-7px) rotate(1.4deg) }
 }
 @keyframes ss-heli { from { transform: translateX(-16px) } to { transform: translateX(18px) } }
+@keyframes ss-glow {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: .55 }
+  50% { transform: translate3d(2%, -3%, 0) scale(1.08); opacity: .85 }
+}
 @keyframes ss-fade-up {
   from { opacity: 0; transform: translateY(14px) }
   to { opacity: 1; transform: translateY(0) }
@@ -64,9 +68,10 @@ const THEME_CSS = `
 .ss-wave-c { animation: ss-wave 8s linear infinite }
 .ss-boat { animation: ss-bob 4.5s ease-in-out infinite }
 .ss-heli { animation: ss-heli 9s ease-in-out infinite alternate }
+.ss-glow { animation: ss-glow 12s ease-in-out infinite }
 .ss-view { animation: ss-fade-up .45s cubic-bezier(.22, 1, .36, 1) both }
 @media (prefers-reduced-motion: reduce) {
-  .ss-rain-a, .ss-rain-b, .ss-flash, .ss-wave-a, .ss-wave-b, .ss-wave-c, .ss-boat, .ss-heli, .ss-view { animation: none }
+  .ss-rain-a, .ss-rain-b, .ss-flash, .ss-wave-a, .ss-wave-b, .ss-wave-c, .ss-boat, .ss-heli, .ss-glow, .ss-view { animation: none }
   .ss-flash { opacity: 0 }
 }
 `
@@ -174,13 +179,28 @@ function SceneBackdrop() {
   return (
     <div className="fixed inset-0 overflow-hidden" aria-hidden="true">
       <div className="absolute inset-0 bg-gradient-to-b from-[#082742] via-[#11496e] to-[#0a3252]" />
+      <div className="ss-glow absolute -left-[12%] top-[25%] h-[34rem] w-[34rem] rounded-full bg-cyan-300/10 blur-[100px]" />
+      <div className="ss-glow absolute right-[4%] top-[9%] h-[28rem] w-[28rem] rounded-full bg-sky-300/10 blur-[90px]" />
       {/* storm clouds */}
       <div className="absolute -top-24 left-[4%] h-72 w-[560px] rounded-full bg-[#1b5a86]/45 blur-3xl" />
       <div className="absolute top-6 right-[6%] h-64 w-[500px] rounded-full bg-[#12466e]/70 blur-3xl" />
       <div className="absolute top-28 left-[34%] h-56 w-[440px] rounded-full bg-[#0e3a5f]/80 blur-3xl" />
       {/* warm horizon glow */}
-      <div className="absolute left-[2%] top-[44%] h-[360px] w-[640px] rounded-full bg-amber-500/15 blur-3xl" />
-      <div className="absolute left-[16%] top-[54%] h-[220px] w-[380px] rounded-full bg-orange-400/10 blur-3xl" />
+      <div className="absolute left-[2%] top-[44%] h-[360px] w-[640px] rounded-full bg-amber-500/20 blur-3xl" />
+      <div className="absolute left-[16%] top-[54%] h-[220px] w-[380px] rounded-full bg-orange-400/15 blur-3xl" />
+      <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(7,27,46,.12)_0%,transparent_44%,rgba(4,18,31,.35)_100%)]" />
+      <svg className="pointer-events-none absolute inset-x-0 bottom-20 h-[56%] w-full opacity-45" viewBox="0 0 1440 460" preserveAspectRatio="xMidYMax slice" fill="none">
+        <path d="M0 290 42 248l18 12 18-34 28 32 18-15 35 44 26-20 32 23 24-28 18 17 28-38 25 30 23-13 26 33 25-22 35 26 30-38 28 32 33-13 24 22 26-31 24 21 31-45 28 33 31-19 23 27 28-35 36 29 25-39 32 35 23-22 30 26 26-32 32 24 25-40 29 27 25-16 27 29 25-33 33 28 23-42 35 30 26-22 28 24 26-37 31 31 26-20 28 27 29-37 35 29 25-24 25 26 29-38 28 33 27-20 27 28 31-40 30 28 25-23 31 26 25-31 35 29 27-20 32 22 28-35 30 27 28-18 31 26 28-33 32 34 22-19 32 20 35-38 26 27 30-20 31 28 28-36 32 30 25-18 30 22 24-30 38 26 22-23 31 22 30-36 33 31 22-18 28 20 28-34 38 29 24-21 27 20 34-33 35 29 23-17 30 24 30-28 35 23 22-21 31 24 30-37 37 30 24-19 29 21 28-31 34 26 28-18 28 22 30-31 42 30V460H0Z" fill="#071e35" />
+        <g fill="#06192c">
+          <path d="M1010 280h158v91h-158zM992 280l97-73 97 73zM1034 304h37v67h-37zM1100 305h47v32h-47z" />
+          <path d="M1188 266h135v105h-135zM1172 266l84-61 84 61zM1208 292h31v79h-31zM1261 292h42v31h-42z" />
+          <path d="M945 371c0-33 14-53 32-66 18 13 30 33 30 66h-15c0-19-6-35-15-46-10 11-17 27-17 46z" />
+          <path d="M975 320c-14-28-34-41-59-43 11 20 29 34 55 42-17-22-21-43-12-66 14 19 20 39 16 62 9-28 25-45 50-52-4 25-18 44-42 57 25-7 46-5 66 8-23 9-46 7-67-3z" />
+          <path d="M1375 371c0-27 10-43 24-54 15 11 24 27 24 54h-12c0-15-5-28-12-37-8 9-13 22-13 37z" />
+          <path d="M1397 330c-11-22-26-32-46-34 9 16 23 27 43 34-13-18-16-35-9-53 11 15 15 31 12 50 7-22 20-36 40-42-3 20-14 35-33 46 20-6 36-4 52 6-18 7-36 6-53-2z" />
+        </g>
+        <path d="M0 364c112-24 180-20 278-2s159 25 270 4 178-27 280-5 181 25 286 0 196-28 326 0v99H0z" fill="#092640" opacity=".88" />
+      </svg>
       {/* helicopter searchlight */}
       <div className="absolute left-[28%] top-[12%] h-[520px] w-[220px] rotate-[24deg] bg-gradient-to-b from-amber-200/20 via-amber-100/[.06] to-transparent blur-2xl" />
       <RescueHeli className="ss-heli absolute left-[31%] top-[6%] hidden w-44 md:block xl:w-48" />
@@ -189,6 +209,12 @@ function SceneBackdrop() {
       <SceneLightning />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(2,12,22,.5)_100%)]" />
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#04121f]/15 to-[#04121f]/50" />
+      <svg className="pointer-events-none absolute bottom-0 left-0 h-72 w-[55%] opacity-[.12]" viewBox="0 0 720 360" fill="none" aria-hidden="true">
+        <path d="M-30 356C80 270 145 322 232 248s152-57 207-126S574 31 742 8" stroke="#bae6fd" strokeWidth="1.2" />
+        <path d="M-30 378C80 292 145 344 232 270s152-57 207-126S574 53 742 30" stroke="#bae6fd" strokeWidth="1.2" />
+        <path d="M-30 400C80 314 145 366 232 292s152-57 207-126S574 75 742 52" stroke="#bae6fd" strokeWidth="1.2" />
+        <path d="M-30 422C80 336 145 388 232 314s152-57 207-126S574 97 742 74" stroke="#bae6fd" strokeWidth="1.2" />
+      </svg>
       <RescueBoat className="ss-boat absolute bottom-[5.5rem] left-[5%] z-[1] hidden w-52 drop-shadow-[0_18px_28px_rgba(0,0,0,.5)] lg:block xl:w-60" />
       <SceneWaves />
     </div>
@@ -428,21 +454,28 @@ const SUBTITLES = {
 
 function MarketingPanel() {
   return (
-    <section className="hidden max-w-xl text-white lg:block">
-      <h2 className="text-[2.6rem] font-extrabold leading-[1.1] tracking-tight xl:text-5xl">
+    <section className="hidden max-w-2xl text-white lg:block">
+      <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-slate-950/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-cyan-100 backdrop-blur">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-60" />
+          <span className="relative h-2 w-2 rounded-full bg-emerald-300" />
+        </span>
+        Disaster response · community relief
+      </span>
+      <h2 className="text-[2.5rem] font-extrabold leading-[1.08] tracking-tight drop-shadow-sm xl:text-[3.5rem]">
         Together for a<br />
-        <span className="bg-gradient-to-r from-sky-300 to-cyan-200 bg-clip-text text-transparent">Safer Tomorrow</span>
+        <span className="bg-gradient-to-r from-sky-200 via-cyan-200 to-amber-100 bg-clip-text text-transparent">Safer Tomorrow</span>
       </h2>
-      <p className="mt-5 max-w-md text-base leading-relaxed text-sky-100/75">
+      <p className="mt-4 max-w-lg text-sm leading-relaxed text-sky-50/80 xl:text-base">
         Connecting people, resources and real-time information to support communities during disasters.
       </p>
-      <ul className="mt-10 grid max-w-md grid-cols-3 gap-5">
+      <ul className="mt-8 grid max-w-lg grid-cols-3 divide-x divide-white/15">
         {FEATURES.map(({ icon: Icon, title }) => (
-          <li key={title} className="flex flex-col items-center gap-2.5 text-center">
-            <span className="grid h-12 w-12 place-items-center rounded-full border border-white/15 bg-white/10 text-cyan-200 backdrop-blur">
+          <li key={title} className="flex flex-col items-center gap-2 px-3 text-center">
+            <span className="grid h-11 w-11 place-items-center rounded-full border border-white/15 bg-white/10 text-cyan-100 backdrop-blur">
               <Icon size={20} aria-hidden="true" />
             </span>
-            <span className="text-sm font-semibold leading-snug text-white/90">{title}</span>
+            <span className="text-xs font-semibold leading-snug text-white/90">{title}</span>
           </li>
         ))}
       </ul>
@@ -456,7 +489,7 @@ export default function AuthPage({ recovering = false }) {
   const view = recovering ? 'recovery' : state.view
 
   return (
-    <div className="relative min-h-screen font-['Plus_Jakarta_Sans',ui-sans-serif,system-ui,sans-serif]">
+    <div className="relative isolate min-h-screen overflow-hidden bg-[#082742] font-['Plus_Jakarta_Sans',ui-sans-serif,system-ui,sans-serif]">
       <style>{THEME_CSS}</style>
       {/* If your app already loads a webfont, you can delete the links below */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -466,37 +499,24 @@ export default function AuthPage({ recovering = false }) {
       <SceneBackdrop />
 
       {/* Brand — desktop */}
-      <div className="absolute left-10 top-9 z-20 hidden items-center gap-3 lg:flex xl:left-14 xl:top-11">
-        <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 text-white shadow-lg shadow-sky-900/40">
-          <Droplets size={24} fill="currentColor" />
-        </div>
-        <div>
-          <p className="text-xl font-extrabold leading-tight tracking-tight text-white">Sankat<span className="text-sky-400">Saathi</span></p>
-          <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-sky-200/70">No one faces disaster alone</p>
-        </div>
-      </div>
+      <BrandLogo
+        size="small"
+        className="absolute left-6 top-6 z-20 hidden drop-shadow-xl xl:left-10 xl:top-8 lg:flex"
+      />
 
-      <div className="relative z-10 mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 items-center gap-12 px-4 py-12 sm:px-8 lg:grid-cols-[1.05fr_.95fr] lg:px-12">
+      <div className="relative z-10 mx-auto grid min-h-screen w-full max-w-[90rem] grid-cols-1 items-center gap-10 px-4 py-8 sm:px-8 lg:grid-cols-[1.1fr_.9fr] lg:gap-12 lg:px-12">
         <MarketingPanel />
 
         <section className="mx-auto w-full max-w-md lg:mx-0 lg:justify-self-end">
           {/* Brand — mobile */}
-          <div className="mb-5 flex items-center justify-center gap-2.5 text-white lg:hidden">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 shadow-lg shadow-sky-900/40">
-              <Droplets size={22} fill="currentColor" />
-            </div>
-            <span className="text-xl font-extrabold tracking-tight">Sankat<span className="text-sky-400">Saathi</span></span>
-          </div>
+          <BrandLogo size="small" className="mx-auto mb-5 drop-shadow-xl lg:hidden" />
 
-          <div className="overflow-hidden rounded-[28px] border border-white/70 bg-white/95 shadow-2xl shadow-black/40 backdrop-blur-xl">
-            <div className="p-6 sm:p-8">
-              <div className="mb-6 flex flex-col items-center text-center">
-                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 to-cyan-400 text-white shadow-lg shadow-sky-500/40">
-                  <Droplets size={28} fill="currentColor" />
-                </div>
-                <p className="mt-2.5 text-lg font-extrabold tracking-tight text-slate-900">Sankat<span className="text-sky-600">Saathi</span></p>
-                <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Disaster Relief & Support Platform</p>
-              </div>
+          <div className="overflow-hidden rounded-2xl border border-white/80 bg-slate-50/95 shadow-[0_28px_90px_-24px_rgba(0,0,0,.65)] ring-1 ring-slate-900/10 backdrop-blur-xl">
+            <div className="p-6 sm:p-7">
+              <BrandLogo
+                size="medium"
+                className="mx-auto mb-6"
+              />
 
               <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">{TITLES[view]}</h1>
               <p className="mb-5 mt-1 text-sm text-slate-500">{SUBTITLES[view]}</p>

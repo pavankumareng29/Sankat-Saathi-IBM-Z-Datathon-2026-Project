@@ -54,11 +54,11 @@ export default function OverviewPage({ data, goTo }) {
               className="rise rounded-2xl border border-stone-200/70 bg-white p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-[0_14px_28px_-18px_rgba(28,25,23,0.35)]"
             >
               <div className="flex items-start justify-between gap-3">
-                <span className="pt-1 text-[11px] font-semibold uppercase tracking-[0.09em] text-stone-400">{s.label}</span>
+                <span className="pt-1 text-[11px] font-bold uppercase tracking-[0.09em] text-stone-600">{s.label}</span>
                 <span className={`rounded-lg p-2 ${tone.chip}`}><Icon size={17} strokeWidth={2.2} /></span>
               </div>
               <b className="mt-3 block text-[28px] leading-none tracking-tight text-stone-900 tabular-nums">{s.value}</b>
-              <span className="mt-3 flex items-center gap-1.5 text-xs text-stone-500">
+              <span className="mt-3 flex items-center gap-1.5 text-xs font-medium text-stone-600">
                 <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
                 {s.change}
               </span>
@@ -73,7 +73,7 @@ export default function OverviewPage({ data, goTo }) {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead>
-                <tr className="border-b border-stone-200 text-[11px] uppercase tracking-[0.08em] text-stone-400">
+                <tr className="border-b border-stone-200 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-600">
                   <th className="pb-3 font-semibold">Area</th>
                   <th className="pb-3 font-semibold">Need</th>
                   <th className="pb-3 font-semibold">People</th>

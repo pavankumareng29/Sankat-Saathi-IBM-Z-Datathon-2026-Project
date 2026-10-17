@@ -6,7 +6,6 @@ import {
 import { Badge, Card } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../services/supabase'
-import { centres } from '../data/centres'
 import RequestAssistancePage from './RequestAssistancePage'
 import MyRequestsPage from './MyRequestsPage'
 import ReliefCentresPage from './ReliefCentresPage'
@@ -30,8 +29,11 @@ const timeAgo = (iso) => {
 }
 
 const fromRow = (r) => ({
-  id: `REQ-${r.id}`, type: r.category, sub: r.medical_type, people: r.people_affected,
-  location: r.location, status: r.status, time: timeAgo(r.created_at),
+  id: r.request_code, type: r.category, sub: r.medical_type, people: r.people_affected,
+  location: r.location_text, status: ({
+    submitted: 'Pending', acknowledged: 'Pending', assigned: 'Assigned',
+    in_progress: 'On the way', fulfilled: 'Delivered', cancelled: 'Cancelled',
+  })[r.status] || r.status, time: timeAgo(r.created_at),
 })
 
 /* ---------- UI pieces ---------- */
@@ -155,39 +157,79 @@ export default function CitizenPortal({ active = 'Overview', notify = () => {}, 
   const { user } = useAuth()
   const [requests, setRequests] = useState([])
   const [loadingRequests, setLoadingRequests] = useState(true)
+  const [requestError, setRequestError] = useState('')
+  const [centresCount, setCentresCount] = useState(0)
+  const [openCentresCount, setOpenCentresCount] = useState(0)
   const [safetyOpen, setSafetyOpen] = useState(false)
   const [profile, setProfile] = useState({
-    name: user?.name || '', phone: user?.phone || '', email: user?.email || '', address: '',
+    name: user?.name || '', phone: user?.phone || '', email: user?.email || '', address: user?.address || '',
   })
+  const [savingProfile, setSavingProfile] = useState(false)
 
   // Load this citizen's saved requests
   useEffect(() => {
-    if (!user) return
     let cancelled = false
-    supabase.from('requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+    if (!user) {
+      setLoadingRequests(false)
+      return () => { cancelled = true }
+    }
+    supabase.from('assistance_requests')
+      .select('id, request_code, category, medical_type, people_affected, location_text, status, created_at')
+      .eq('requester_id', user.id)
+      .order('created_at', { ascending: false })
       .then(({ data, error }) => {
         if (cancelled) return
-        if (!error && data) setRequests(data.map(fromRow))
+        if (error) setRequestError(`Could not load your requests: ${error.message}`)
+        else setRequests((data || []).map(fromRow))
         setLoadingRequests(false)
       })
     return () => { cancelled = true }
   }, [user])
 
+  useEffect(() => {
+    let cancelled = false
+    supabase.from('relief_centres')
+      .select('id, status')
+      .then(({ data, error }) => {
+        if (cancelled || error) return
+        setCentresCount(data.length)
+        setOpenCentresCount(data.filter((centre) => centre.status === 'open').length)
+      })
+    return () => { cancelled = true }
+  }, [])
+
   // Resolves only when the request is really saved; throws otherwise
   const addRequest = async (p) => {
-    const { data, error } = await supabase.from('requests').insert({
-      category: p.category, medical_type: p.medicalType, details: p.details,
-      people_affected: p.peopleAffected, location: p.location,
-      lat: p.coords?.lat ?? null, lng: p.coords?.lng ?? null, phone: p.phone, name: p.name,
-    }).select().single()
-    if (error) throw new Error('We could not save your request. Please try again or call 108.')
+    const { data, error } = await supabase.from('assistance_requests').insert({
+      requester_id: user.id,
+      category: p.category,
+      medical_type: p.medicalType,
+      details: p.details,
+      people_affected: p.peopleAffected,
+      contact_name: p.name || user.name,
+      contact_phone: p.phone || user.phone,
+      location_text: p.location,
+      latitude: p.coords?.lat ?? null,
+      longitude: p.coords?.lng ?? null,
+    }).select('id, request_code, category, medical_type, people_affected, location_text, status, created_at').single()
+    if (error) throw new Error(`We could not save your request: ${error.message}`)
     setRequests((prev) => [fromRow(data), ...prev])
-    return `REQ-${data.id}`
+    return data.request_code
   }
 
-  const openCentres = centres.filter((c) => c.status === 'Open').length
   const latest = requests[0]
   const pageTitle = active === 'Overview' ? 'Citizen Portal' : active
+  const saveProfile = async () => {
+    setSavingProfile(true)
+    const { error } = await supabase.from('profiles').update({
+      name: profile.name.trim(),
+      phone: profile.phone.trim(),
+      address: profile.address.trim() || null,
+    }).eq('id', user.id)
+    setSavingProfile(false)
+    if (error) notify(`Could not save profile: ${error.message}`)
+    else notify('Profile saved.')
+  }
 
   return (
     <div className="space-y-5 rounded-3xl bg-gradient-to-b from-sky-50 via-white to-slate-50 p-4 shadow-xl sm:p-6">
@@ -202,7 +244,7 @@ export default function CitizenPortal({ active = 'Overview', notify = () => {}, 
         </button>
       )}
 
-      {active !== 'Overview' && (
+      {active !== 'Overview' && active !== 'Request Assistance' && (
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-sky-600">Citizen Portal</p>
           <h1 className="text-3xl font-extrabold text-slate-900">{pageTitle}</h1>
@@ -235,7 +277,7 @@ export default function CitizenPortal({ active = 'Overview', notify = () => {}, 
               <p className="text-xs text-slate-500">Tap to call</p>
             </InfoTile>
             <InfoTile icon={Home} tint="bg-sky-50 text-sky-600" label="Relief Centres" onClick={() => goTo('Relief Centres')}>
-              <p className="flex items-baseline gap-2"><span className="text-3xl font-extrabold text-slate-900">{centres.length}</span><span className="text-sm text-slate-500">{openCentres} open now</span></p>
+              <p className="flex items-baseline gap-2"><span className="text-3xl font-extrabold text-slate-900">{centresCount}</span><span className="text-sm text-slate-500">{openCentresCount} open now</span></p>
             </InfoTile>
             <InfoTile icon={Users} tint="bg-violet-50 text-violet-600" label="Available Resources" onClick={() => goTo('Relief Centres')}>
               <p className="text-sm text-slate-500">Food, Water, Medicine and more</p>
@@ -251,7 +293,7 @@ export default function CitizenPortal({ active = 'Overview', notify = () => {}, 
 
       {active === 'My Requests' && (loadingRequests
         ? <Card><p className="text-slate-500">Loading your requests…</p></Card>
-        : <MyRequestsPage requests={requests} goTo={goTo} />)}
+        : <>{requestError && <p role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{requestError}</p>}<MyRequestsPage requests={requests} goTo={goTo} /></>)}
 
       {active === 'Relief Centres' && <ReliefCentresPage notify={notify} />}
 
@@ -284,7 +326,7 @@ export default function CitizenPortal({ active = 'Overview', notify = () => {}, 
               <input id="pf-address" className={input} placeholder="Area, city" value={profile.address} onChange={(e) => setProfile({ ...profile, address: e.target.value })} />
             </div>
           </div>
-          <button onClick={() => notify('Profile saved.')} className="mt-5 rounded-xl bg-sky-600 px-6 py-3 font-semibold text-white hover:bg-sky-700">Save profile</button>
+          <button disabled={savingProfile} onClick={saveProfile} className="mt-5 rounded-xl bg-sky-600 px-6 py-3 font-semibold text-white hover:bg-sky-700 disabled:opacity-60">{savingProfile ? 'Saving…' : 'Save profile'}</button>
         </Card>
       )}
     </div>
