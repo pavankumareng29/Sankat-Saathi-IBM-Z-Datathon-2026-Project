@@ -16,29 +16,53 @@ export default function InventoryPage({ data }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [optionsError, setOptionsError] = useState('')
+  const [optionsRetry, setOptionsRetry] = useState(0)
   const [notice, setNotice] = useState('')
 
   useEffect(() => {
     let cancelled = false
     const loadOptions = async () => {
-      const [{ data: memberships, error: membershipError }, { data: catalog, error: catalogError }] = await Promise.all([
+      setLoading(true)
+      const [membershipResult, catalogResult] = await Promise.allSettled([
         supabase.from('ngo_memberships').select('partner_id').eq('profile_id', user.id).eq('status', 'active'),
         supabase.from('resource_catalog').select('id, name, unit').order('name'),
       ])
       if (cancelled) return
-      if (membershipError || catalogError) {
-        setError(`Could not load inventory options: ${(membershipError || catalogError).message}`)
-      } else {
-        const activePartnerId = memberships[0]?.partner_id || ''
+
+      const loadErrors = []
+      if (membershipResult.status === 'fulfilled' && !membershipResult.value.error) {
+        const activePartnerId = membershipResult.value.data?.[0]?.partner_id || ''
         setPartnerId(activePartnerId)
-        setResources(catalog || [])
-        setResourceId(catalog?.[0]?.id || '')
+      } else {
+        setPartnerId('')
+        const message = membershipResult.status === 'rejected'
+          ? membershipResult.reason?.message || String(membershipResult.reason)
+          : membershipResult.value.error.message
+        loadErrors.push(`Could not load NGO membership: ${message}`)
       }
+
+      if (catalogResult.status === 'fulfilled' && !catalogResult.value.error) {
+        const catalog = catalogResult.value.data || []
+        setResources(catalog)
+        setResourceId((currentId) => catalog.some((resource) => resource.id === currentId)
+          ? currentId
+          : catalog[0]?.id || '')
+      } else {
+        setResources([])
+        setResourceId('')
+        const message = catalogResult.status === 'rejected'
+          ? catalogResult.reason?.message || String(catalogResult.reason)
+          : catalogResult.value.error.message
+        loadErrors.push(`Could not load resource options: ${message}`)
+      }
+
+      setOptionsError(loadErrors.join(' '))
       setLoading(false)
     }
     loadOptions()
     return () => { cancelled = true }
-  }, [user.id])
+  }, [user.id, optionsRetry])
 
   const saveStock = async (event) => {
     event.preventDefault()
@@ -110,7 +134,8 @@ export default function InventoryPage({ data }) {
         {loading ? <div className="flex justify-center py-6"><LoaderCircle className="animate-spin text-sky-600" /></div> : (
           <form onSubmit={saveStock} className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
             <label className="text-sm font-medium text-slate-700">Resource
-              <select required value={resourceId} onChange={(event) => setResourceId(event.target.value)} className={`${inputClass} mt-1.5`}>
+              <select required disabled={!resources.length} value={resourceId} onChange={(event) => setResourceId(event.target.value)} className={`${inputClass} mt-1.5 disabled:cursor-not-allowed disabled:bg-slate-100`}>
+                {!resources.length && <option value="">No resources configured</option>}
                 {resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name} ({resource.unit})</option>)}
               </select>
             </label>
@@ -122,7 +147,25 @@ export default function InventoryPage({ data }) {
             </button>
           </form>
         )}
+        {!loading && !resources.length && (
+          <p className="mt-3 text-sm text-slate-600">
+            Add the resource catalog by running <code className="rounded bg-slate-100 px-1">supabase/migrations/20261018020000_inventory_catalog_access.sql</code> in Supabase SQL Editor.
+          </p>
+        )}
         {error && <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p>}
+        {optionsError && (
+          <div role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            <p>{optionsError}</p>
+            <button
+              type="button"
+              onClick={() => setOptionsRetry((attempt) => attempt + 1)}
+              disabled={loading}
+              className="rounded-lg border border-rose-300 px-3 py-1.5 font-semibold hover:bg-rose-100 disabled:opacity-50"
+            >
+              Retry
+            </button>
+          </div>
+        )}
         {notice && <p role="status" className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</p>}
       </section>
 
