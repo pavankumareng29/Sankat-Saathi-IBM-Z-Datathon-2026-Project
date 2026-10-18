@@ -22,6 +22,12 @@ function readable(value) {
   return String(value || '').replaceAll('_', ' ')
 }
 
+function requestCategories(request) {
+  return request.needs?.length
+    ? request.needs.map((need) => need.category).join(', ')
+    : request.category
+}
+
 function changedAfterCreated(row) {
   return row.updated_at && row.created_at
     && new Date(row.updated_at).getTime() > new Date(row.created_at).getTime() + 1000
@@ -34,7 +40,7 @@ function addRequestNotifications(notifications, requests, page) {
       request.id,
       request.created_at,
       'New relief request',
-      `${request.request_code} · ${request.category} · ${request.location_text || 'Location not provided'}`,
+      `${request.request_code} · ${requestCategories(request)} · ${request.location_text || 'Location not provided'}`,
       page
     ))
     if (changedAfterCreated(request)) {
@@ -53,7 +59,7 @@ function addRequestNotifications(notifications, requests, page) {
 async function getCitizenNotifications(user) {
   const requests = await queryRows(
     supabase.from('assistance_requests')
-      .select('id, request_code, category, location_text, status, created_at, updated_at')
+      .select('id, request_code, category, location_text, status, created_at, updated_at, needs:assistance_request_needs(category)')
       .eq('requester_id', user.id)
       .gte('updated_at', RECENT_WINDOW)
       .order('updated_at', { ascending: false })
@@ -67,7 +73,7 @@ async function getCitizenNotifications(user) {
       request.id,
       request.updated_at,
       `Request ${request.request_code}`,
-      `${request.category} request · ${readable(request.status)}.`,
+      `${requestCategories(request)} request · ${readable(request.status)}.`,
       'My Requests'
     ))
   }
@@ -195,7 +201,7 @@ async function getNgoNotifications(user) {
   const requests = requestIds.length
     ? await queryRows(
       supabase.from('assistance_requests')
-        .select('id, request_code, category, location_text')
+        .select('id, request_code, category, location_text, needs:assistance_request_needs(category)')
         .in('id', requestIds),
       'assigned request details'
     )
@@ -210,7 +216,7 @@ async function getNgoNotifications(user) {
       assignment.id,
       assignment.updated_at || assignment.assigned_at,
       request ? `Request ${request.request_code} assigned` : 'Request assignment updated',
-      `${request?.category || 'Relief'} · ${request?.location_text || 'Location not provided'} · ${readable(assignment.status)}.`,
+      `${request ? requestCategories(request) : 'Relief'} · ${request?.location_text || 'Location not provided'} · ${readable(assignment.status)}.`,
       'Requests'
     ))
   }
@@ -270,7 +276,7 @@ async function getAdminNotifications() {
   const [requests, incidents, partners, memberships] = await Promise.all([
     queryRows(
       supabase.from('assistance_requests')
-        .select('id, request_code, category, location_text, status, created_at, updated_at')
+        .select('id, request_code, category, location_text, status, created_at, updated_at, needs:assistance_request_needs(category)')
         .gte('created_at', RECENT_WINDOW)
         .order('created_at', { ascending: false })
         .limit(30),

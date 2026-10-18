@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import {
   Check, Droplets, HeartPulse, HelpCircle, LoaderCircle, LocateFixed, MapPin, Minus, Pill,
-  Phone, Plus, Send, Stethoscope, Syringe, User, Utensils, X, AlertCircle,
+  Package, Phone, Plus, Send, Stethoscope, Syringe, User, X, AlertCircle,
 } from 'lucide-react'
 
 const CATEGORIES = [
   { id: 'Medical', icon: HeartPulse, hint: 'Medicines, first aid', grad: 'from-rose-500 to-pink-500', tone: 'bg-rose-50 text-rose-600', soft: 'bg-rose-50 border-rose-200', ring: 'ring-rose-300' },
-  { id: 'Food', icon: Utensils, hint: 'Meals, dry rations', grad: 'from-amber-500 to-orange-500', tone: 'bg-amber-50 text-amber-600', soft: 'bg-amber-50 border-amber-200', ring: 'ring-amber-300' },
+  { id: 'Food', icon: Package, hint: 'Ration kits, essentials', grad: 'from-amber-500 to-orange-500', tone: 'bg-amber-50 text-amber-700', soft: 'bg-amber-50 border-amber-200', ring: 'ring-amber-300' },
   { id: 'Water', icon: Droplets, hint: 'Drinking water', grad: 'from-sky-500 to-blue-600', tone: 'bg-sky-50 text-sky-600', soft: 'bg-sky-50 border-sky-200', ring: 'ring-sky-300' },
   { id: 'Other', icon: HelpCircle, hint: 'Anything else', grad: 'from-slate-500 to-slate-700', tone: 'bg-slate-100 text-slate-600', soft: 'bg-slate-50 border-slate-200', ring: 'ring-slate-300' },
 ]
@@ -31,7 +31,7 @@ const DETAILS = {
 const input =
   'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100'
 const inputError = '!border-rose-500 focus:!ring-rose-100'
-const initialForm = { category: '', medicalType: '', details: '', people: '', phone: '', name: '', location: '', coords: null }
+const initialForm = { categories: [], medicalType: '', detailsByCategory: {}, people: '', phone: '', name: '', location: '', coords: null }
 
 const FieldError = ({ id, message }) =>
   message ? (
@@ -78,15 +78,26 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
     setErrors((e) => {
       const next = { ...e }
       Object.keys(patch).forEach((k) => delete next[k])
-      if ('category' in patch) { delete next.medicalType; delete next.details }
+      if ('detailsByCategory' in patch) delete next.details
       return next
     })
   }
 
   const chooseCategory = (category) => {
-    if (category === form.category) return
-    // Switching category clears the medical subtype and the category-specific details
-    update({ category, medicalType: '', details: '' })
+    const categories = form.categories.includes(category)
+      ? form.categories.filter((item) => item !== category)
+      : [...form.categories, category]
+    update({
+      categories,
+      ...(category === 'Medical' && !categories.includes('Medical') ? { medicalType: '' } : {}),
+    })
+    setErrors((current) => {
+      const next = { ...current }
+      delete next.category
+      if (category === 'Medical') delete next.medicalType
+      if (category === 'Other') delete next.details
+      return next
+    })
   }
 
   const changePeople = (delta) => {
@@ -110,9 +121,9 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
 
   const validate = () => {
     const e = {}
-    if (!form.category) e.category = 'Please choose the type of help you need.'
-    if (form.category === 'Medical' && !form.medicalType) e.medicalType = 'Please choose the medical help you need.'
-    if (form.category === 'Other' && !form.details.trim()) e.details = 'Please describe the assistance you need.'
+    if (!form.categories.length) e.category = 'Please choose at least one type of help you need.'
+    if (form.categories.includes('Medical') && !form.medicalType) e.medicalType = 'Please choose the medical help you need.'
+    if (form.categories.includes('Other') && !form.detailsByCategory.Other?.trim()) e.details = 'Please describe the assistance you need.'
     const people = Number(form.people)
     if (!form.people || !Number.isInteger(people) || people < 1) e.people = 'Enter how many people are affected (1 or more).'
     if (!form.location.trim()) e.location = 'Please add your location or tap "Use my current location".'
@@ -131,9 +142,11 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
     }
 
     const payload = {
-      category: form.category,
-      medicalType: form.category === 'Medical' ? form.medicalType : null,
-      details: form.details.trim(),
+      needs: form.categories.map((category) => ({
+        category,
+        medicalType: category === 'Medical' ? form.medicalType : null,
+        details: form.detailsByCategory[category]?.trim() || null,
+      })),
       peopleAffected: Number(form.people),
       location: form.location.trim(),
       coords: form.coords,
@@ -154,18 +167,16 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
     }
   }
 
-  const detailsCfg = DETAILS[form.category]
-  const selected = CATEGORIES.find((c) => c.id === form.category)
-
   // Progress (display only)
-  const step1 = !!form.category && (form.category !== 'Medical' || !!form.medicalType)
+  const step1 = form.categories.length > 0 && (!form.categories.includes('Medical') || !!form.medicalType)
   const step2 = Number(form.people) >= 1 && !!form.location.trim()
   const step3 = form.phone.replace(/\D/g, '').length >= 10
   const doneCount = [step1, step2, step3].filter(Boolean).length
 
   const summary = step1
-    ? `${form.category}${form.medicalType ? ` · ${form.medicalType}` : ''}${form.people ? ` · ${form.people} ${Number(form.people) === 1 ? 'person' : 'people'}` : ''}`
+    ? `${form.categories.join(', ')}${form.medicalType ? ` · ${form.medicalType}` : ''}${form.people ? ` · ${form.people} ${Number(form.people) === 1 ? 'person' : 'people'}` : ''}`
     : 'Choose what you need to get started'
+  const selectedCategories = CATEGORIES.filter(({ id }) => form.categories.includes(id))
 
   return (
     <form onSubmit={submit} noValidate className="mx-auto max-w-5xl space-y-4">
@@ -217,12 +228,12 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
       </div>
 
       {/* Step 1 */}
-      <Section step="1" title="What do you need?" subtitle="Pick one" done={step1}>
+      <Section step="1" title="What do you need?" subtitle="Select all that apply" done={step1}>
         <fieldset aria-describedby={errors.category ? 'err-category' : undefined}>
           <legend className="sr-only">Type of assistance</legend>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {CATEGORIES.map(({ id, icon: Icon, hint, tone, soft, ring }) => {
-              const on = form.category === id
+              const on = form.categories.includes(id)
               return (
                 <label
                   key={id}
@@ -232,7 +243,7 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
                 >
                   <input
                     id={id === 'Medical' ? 'field-category' : undefined}
-                    type="radio" name="category" value={id} checked={on}
+                    type="checkbox" name="category" value={id} checked={on}
                     onChange={() => chooseCategory(id)} className="sr-only"
                   />
                   {on && <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-emerald-500 text-white"><Check size={14} aria-hidden="true" /></span>}
@@ -246,7 +257,7 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
         </fieldset>
         <FieldError id="err-category" message={errors.category} />
 
-        {form.category === 'Medical' && (
+        {form.categories.includes('Medical') && (
           <fieldset className="rise mt-6" aria-describedby={errors.medicalType ? 'err-medical' : undefined}>
             <legend className="mb-2.5 text-sm font-bold text-slate-700">What kind of medical help?</legend>
             <div className="grid gap-2.5 sm:grid-cols-2">
@@ -270,21 +281,27 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
           </fieldset>
         )}
 
-        {detailsCfg && (
-          <div className="rise mt-6">
-            <label htmlFor="field-details" className="mb-1.5 block text-sm font-bold text-slate-700">{detailsCfg.label}</label>
-            <textarea
-              id="field-details" rows={3} maxLength={500} value={form.details} placeholder={detailsCfg.placeholder}
-              aria-invalid={!!errors.details} aria-describedby={errors.details ? 'err-details' : undefined}
-              onChange={(e) => update({ details: e.target.value })}
-              className={`${input} resize-none ${errors.details ? inputError : ''}`}
-            />
-            <div className="flex items-start justify-between gap-3">
-              <FieldError id="err-details" message={errors.details} />
-              <span className="ml-auto mt-1.5 text-xs text-slate-400">{form.details.length}/500</span>
+        {form.categories.filter((category) => DETAILS[category]).map((category) => {
+          const detailsCfg = DETAILS[category]
+          const value = form.detailsByCategory[category] || ''
+          const fieldId = category === 'Other' ? 'field-details' : `field-details-${category.toLowerCase()}`
+          return (
+            <div key={category} className="rise mt-6">
+              <label htmlFor={fieldId} className="mb-1.5 block text-sm font-bold text-slate-700">{detailsCfg.label}</label>
+              <textarea
+                id={fieldId} rows={3} maxLength={500} value={value} placeholder={detailsCfg.placeholder}
+                aria-invalid={category === 'Other' && !!errors.details}
+                aria-describedby={category === 'Other' && errors.details ? 'err-details' : undefined}
+                onChange={(e) => update({ detailsByCategory: { ...form.detailsByCategory, [category]: e.target.value } })}
+                className={`${input} resize-none ${category === 'Other' && errors.details ? inputError : ''}`}
+              />
+              <div className="flex items-start justify-between gap-3">
+                {category === 'Other' && <FieldError id="err-details" message={errors.details} />}
+                <span className="ml-auto mt-1.5 text-xs text-slate-400">{value.length}/500</span>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })}
       </Section>
 
       {/* Step 2 */}
@@ -365,7 +382,11 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
       {/* Submit bar */}
       <div className="sticky bottom-3 z-10 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:p-4">
         <div className="mb-3 flex items-center gap-2 px-1 text-sm">
-          {selected && <span className={`grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br text-white ${selected.grad}`}><selected.icon size={15} aria-hidden="true" /></span>}
+          {selectedCategories.map(({ id, icon: Icon, grad }) => (
+            <span key={id} className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br text-white ${grad}`}>
+              <Icon size={15} aria-hidden="true" />
+            </span>
+          ))}
           <p className="truncate font-semibold text-slate-700">{summary}</p>
         </div>
         <button

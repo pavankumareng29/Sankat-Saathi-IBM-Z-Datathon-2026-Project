@@ -18,7 +18,7 @@ const timeLabel = (createdAt) => {
 export async function getDashboardData(user) {
   const requestsPromise = queryData(
     supabase.from('assistance_requests')
-      .select('id, request_code, category, medical_type, details, people_affected, location_text, priority, status, created_at')
+      .select('id, request_code, category, medical_type, details, people_affected, location_text, priority, status, created_at, needs:assistance_request_needs(category)')
       .order('created_at', { ascending: false }),
     'relief requests'
   )
@@ -69,7 +69,13 @@ export async function getDashboardData(user) {
     id: request.request_code,
     requestId: request.id,
     area: request.location_text,
-    need: [request.category, request.medical_type, request.details].filter(Boolean).join(' · '),
+    need: [
+      request.needs?.length
+        ? request.needs.map((need) => need.category).join(', ')
+        : request.category,
+      request.medical_type,
+      request.details,
+    ].filter(Boolean).join(' · '),
     people: request.people_affected,
     priority: priorityLabel(request.priority),
     time: timeLabel(request.created_at),

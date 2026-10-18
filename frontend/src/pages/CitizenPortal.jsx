@@ -29,7 +29,9 @@ const timeAgo = (iso) => {
 }
 
 const fromRow = (r) => ({
-  id: r.request_code, type: r.category, sub: r.medical_type, people: r.people_affected,
+  id: r.request_code,
+  type: r.needs?.length ? r.needs.map((need) => need.category).join(', ') : r.category,
+  sub: r.medical_type, people: r.people_affected,
   location: r.location_text, status: ({
     submitted: 'Pending', acknowledged: 'Pending', assigned: 'Assigned',
     in_progress: 'On the way', fulfilled: 'Delivered', cancelled: 'Cancelled',
@@ -174,7 +176,7 @@ export default function CitizenPortal({ active = 'Overview', notify = () => {}, 
       return () => { cancelled = true }
     }
     supabase.from('assistance_requests')
-      .select('id, request_code, category, medical_type, people_affected, location_text, status, created_at')
+      .select('id, request_code, category, medical_type, people_affected, location_text, status, created_at, needs:assistance_request_needs(category)')
       .eq('requester_id', user.id)
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
@@ -200,18 +202,15 @@ export default function CitizenPortal({ active = 'Overview', notify = () => {}, 
 
   // Resolves only when the request is really saved; throws otherwise
   const addRequest = async (p) => {
-    const { data, error } = await supabase.from('assistance_requests').insert({
-      requester_id: user.id,
-      category: p.category,
-      medical_type: p.medicalType,
-      details: p.details,
-      people_affected: p.peopleAffected,
-      contact_name: p.name || user.name,
-      contact_phone: p.phone || user.phone,
-      location_text: p.location,
-      latitude: p.coords?.lat ?? null,
-      longitude: p.coords?.lng ?? null,
-    }).select('id, request_code, category, medical_type, people_affected, location_text, status, created_at').single()
+    const { data, error } = await supabase.rpc('create_assistance_request', {
+      p_needs: p.needs,
+      p_people_affected: p.peopleAffected,
+      p_contact_name: p.name || user.name,
+      p_contact_phone: p.phone || user.phone,
+      p_location_text: p.location,
+      p_latitude: p.coords?.lat ?? null,
+      p_longitude: p.coords?.lng ?? null,
+    })
     if (error) throw new Error(`We could not save your request: ${error.message}`)
     setRequests((prev) => [fromRow(data), ...prev])
     return data.request_code
