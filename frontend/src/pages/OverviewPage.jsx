@@ -33,6 +33,7 @@ export default function OverviewPage({ data, goTo }) {
       <PageHeader
         title={`${partOfDay()}, Command.`}
         subtitle="Live status across requests, allocation and field logistics."
+        showLocation={false}
       >
         <button
           onClick={() => goTo('Requests')}
