@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, ChevronRight, ClipboardList, Droplets, Route, Truck, Users } from 'lucide-react'
+import { AlertTriangle, ArrowRight, ChevronRight, Droplets, Route, Truck, Users } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Panel from '../components/Panel'
 
@@ -21,7 +21,7 @@ const partOfDay = () => {
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
 }
 
-export default function OverviewPage({ data, goTo }) {
+export default function OverviewPage({ data }) {
   return (
     <>
       <style>{`
@@ -34,12 +34,6 @@ export default function OverviewPage({ data, goTo }) {
         title={`${partOfDay()}, Command.`}
         subtitle="Live status across requests, allocation and field logistics."
       >
-        <button
-          onClick={() => goTo('Requests')}
-          className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_12px_20px_-12px_rgba(28,25,23,0.55)] transition hover:bg-stone-700 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2"
-        >
-          <ClipboardList size={16} /> Create relief request
-        </button>
       </PageHeader>
 
       {/* --- stat cards --- */}

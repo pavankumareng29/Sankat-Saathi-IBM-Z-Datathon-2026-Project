@@ -28,15 +28,27 @@ const timeAgo = (iso) => {
   return `${Math.round(mins / 1440)} day(s) ago`
 }
 
-const fromRow = (r) => ({
-  id: r.request_code,
-  type: r.needs?.length ? r.needs.map((need) => need.category).join(', ') : r.category,
-  sub: r.medical_type, people: r.people_affected,
-  location: r.location_text, status: ({
-    submitted: 'Pending', acknowledged: 'Pending', assigned: 'Assigned',
-    in_progress: 'On the way', fulfilled: 'Delivered', cancelled: 'Cancelled',
-  })[r.status] || r.status, time: timeAgo(r.created_at),
-})
+const fromRow = (r) => {
+  const latestDelivery = (r.allocations || [])
+    .flatMap((allocation) => allocation.deliveries || [])
+    .sort((left, right) => new Date(right.updated_at) - new Date(left.updated_at))[0]
+  const status = latestDelivery?.status || r.status
+  return {
+    id: r.request_code,
+    type: r.needs?.length ? r.needs.map((need) => need.category).join(', ') : r.category,
+    sub: r.medical_type, people: r.people_affected,
+    supplies: (r.needs || []).flatMap((need) => (need.items || []).map((item) => {
+      const resource = Array.isArray(item.resource) ? item.resource[0] : item.resource
+      return `${resource?.name || 'Supply'}: ${Number(item.requested_quantity).toLocaleString()} ${resource?.unit || 'units'}`
+    })),
+    location: r.location_text, status: ({
+      submitted: 'Pending', acknowledged: 'Pending', assigned: 'Assigned',
+      in_progress: 'Preparing', preparing: 'Preparing', loading: 'Loading',
+      en_route: 'En route', fulfilled: 'Delivered', delivered: 'Delivered',
+      cancelled: 'Cancelled',
+    })[status] || status, time: timeAgo(r.created_at),
+  }
+}
 
 /* ---------- UI pieces ---------- */
 
@@ -175,17 +187,37 @@ export default function CitizenPortal({ active = 'Overview', notify = () => {}, 
       setLoadingRequests(false)
       return () => { cancelled = true }
     }
-    supabase.from('assistance_requests')
-      .select('id, request_code, category, medical_type, people_affected, location_text, status, created_at, needs:assistance_request_needs(category)')
+    const loadRequests = () => supabase.from('assistance_requests')
+      .select('id, request_code, category, medical_type, people_affected, location_text, status, created_at, needs:assistance_request_needs(category, medical_type, items:assistance_request_need_items(requested_quantity, resource:resource_catalog(name, unit))), allocations:allocations!allocations_request_id_fkey(deliveries:deliveries!deliveries_allocation_id_fkey(status, updated_at))')
       .eq('requester_id', user.id)
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
         if (cancelled) return
         if (error) setRequestError(`Could not load your requests: ${error.message}`)
-        else setRequests((data || []).map(fromRow))
+        else {
+          setRequestError('')
+          setRequests((data || []).map(fromRow))
+        }
         setLoadingRequests(false)
       })
-    return () => { cancelled = true }
+    loadRequests()
+    const channel = supabase.channel(`citizen-requests-${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'assistance_requests',
+        filter: `requester_id=eq.${user.id}`,
+      }, loadRequests)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'deliveries',
+      }, loadRequests)
+      .subscribe()
+    return () => {
+      cancelled = true
+      supabase.removeChannel(channel)
+    }
   }, [user])
 
   useEffect(() => {
@@ -202,7 +234,7 @@ export default function CitizenPortal({ active = 'Overview', notify = () => {}, 
 
   // Resolves only when the request is really saved; throws otherwise
   const addRequest = async (p) => {
-    const { data, error } = await supabase.rpc('create_assistance_request', {
+    const { data, error } = await supabase.rpc('create_assistance_request_with_items', {
       p_needs: p.needs,
       p_people_affected: p.peopleAffected,
       p_contact_name: p.name || user.name,

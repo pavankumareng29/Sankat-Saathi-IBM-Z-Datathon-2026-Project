@@ -3,6 +3,7 @@ import {
   Check, Droplets, HeartPulse, HelpCircle, LoaderCircle, LocateFixed, MapPin, Minus, Pill,
   Package, Phone, Plus, Send, Stethoscope, Syringe, User, X, AlertCircle,
 } from 'lucide-react'
+import { RESOURCE_OPTIONS, resourcesForNeed } from '../services/resourceMapping'
 
 const CATEGORIES = [
   { id: 'Medical', icon: HeartPulse, hint: 'Medicines, first aid', grad: 'from-rose-500 to-pink-500', tone: 'bg-rose-50 text-rose-600', soft: 'bg-rose-50 border-rose-200', ring: 'ring-rose-300' },
@@ -31,7 +32,7 @@ const DETAILS = {
 const input =
   'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100'
 const inputError = '!border-rose-500 focus:!ring-rose-100'
-const initialForm = { categories: [], medicalType: '', detailsByCategory: {}, people: '', phone: '', name: '', location: '', coords: null }
+const initialForm = { categories: [], medicalType: '', detailsByCategory: {}, requestedItemsByCategory: {}, people: '', phone: '', name: '', location: '', coords: null }
 
 const FieldError = ({ id, message }) =>
   message ? (
@@ -79,7 +80,42 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
       const next = { ...e }
       Object.keys(patch).forEach((k) => delete next[k])
       if ('detailsByCategory' in patch) delete next.details
+      if ('requestedItemsByCategory' in patch) {
+        Object.keys(next).filter((key) => key.startsWith('items-')).forEach((key) => delete next[key])
+      }
       return next
+    })
+  }
+
+  const chooseMedicalType = (medicalType) => {
+    const resources = resourcesForNeed({ category: 'Medical', medical_type: medicalType })
+    update({
+      medicalType,
+      requestedItemsByCategory: {
+        ...form.requestedItemsByCategory,
+        Medical: Object.fromEntries(resources.map((resource) => [
+          resource.code,
+          form.requestedItemsByCategory.Medical?.[resource.code] || '',
+        ])),
+      },
+    })
+  }
+
+  const toggleRequestedResource = (category, code, checked) => {
+    const selected = { ...(form.requestedItemsByCategory[category] || {}) }
+    if (checked) selected[code] = ''
+    else delete selected[code]
+    update({
+      requestedItemsByCategory: { ...form.requestedItemsByCategory, [category]: selected },
+    })
+  }
+
+  const updateRequestedQuantity = (category, code, quantity) => {
+    update({
+      requestedItemsByCategory: {
+        ...form.requestedItemsByCategory,
+        [category]: { ...form.requestedItemsByCategory[category], [code]: quantity },
+      },
     })
   }
 
@@ -90,6 +126,14 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
     update({
       categories,
       ...(category === 'Medical' && !categories.includes('Medical') ? { medicalType: '' } : {}),
+      requestedItemsByCategory: {
+        ...form.requestedItemsByCategory,
+        [category]: categories.includes(category)
+          ? {}
+          : category === 'Water' ? { drinking_water: '' }
+            : category === 'Food' ? { dry_rations: '' }
+              : {},
+      },
     })
     setErrors((current) => {
       const next = { ...current }
@@ -124,6 +168,16 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
     if (!form.categories.length) e.category = 'Please choose at least one type of help you need.'
     if (form.categories.includes('Medical') && !form.medicalType) e.medicalType = 'Please choose the medical help you need.'
     if (form.categories.includes('Other') && !form.detailsByCategory.Other?.trim()) e.details = 'Please describe the assistance you need.'
+    for (const category of form.categories) {
+      const items = form.requestedItemsByCategory[category] || {}
+      if (!Object.keys(items).length) {
+        e[`items-${category}`] = `Choose at least one ${category.toLowerCase()} supply.`
+        continue
+      }
+      if (Object.values(items).some((quantity) => !/^\d{1,11}(?:\.\d{1,3})?$/.test(quantity) || Number(quantity) <= 0)) {
+        e[`items-${category}`] = 'Enter a valid quantity (up to three decimal places) for each selected supply.'
+      }
+    }
     const people = Number(form.people)
     if (!form.people || !Number.isInteger(people) || people < 1) e.people = 'Enter how many people are affected (1 or more).'
     if (!form.location.trim()) e.location = 'Please add your location or tap "Use my current location".'
@@ -146,6 +200,10 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
         category,
         medicalType: category === 'Medical' ? form.medicalType : null,
         details: form.detailsByCategory[category]?.trim() || null,
+        items: Object.entries(form.requestedItemsByCategory[category] || {}).map(([resourceCode, quantity]) => {
+          const resource = RESOURCE_OPTIONS.find((option) => option.code === resourceCode)
+          return { resourceCode, quantity: Number(quantity), unit: resource.unit }
+        }),
       })),
       peopleAffected: Number(form.people),
       location: form.location.trim(),
@@ -268,7 +326,7 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
                     <input
                       id={i === 0 ? 'field-medicalType' : undefined}
                       type="radio" name="medicalType" value={opt} checked={on}
-                      onChange={() => update({ medicalType: opt })} className="sr-only"
+                      onChange={() => chooseMedicalType(opt)} className="sr-only"
                     />
                     <Icon size={20} aria-hidden="true" className={on ? 'text-rose-600' : 'text-slate-400'} />
                     <span className="flex-1">{opt}</span>
@@ -280,6 +338,63 @@ export default function RequestAssistancePage({ addRequest, notify, goTo }) {
             <FieldError id="err-medical" message={errors.medicalType} />
           </fieldset>
         )}
+
+        {form.categories.map((category) => {
+          const options = category === 'Medical'
+            ? resourcesForNeed({ category, medical_type: form.medicalType })
+            : category === 'Other'
+              ? RESOURCE_OPTIONS
+              : RESOURCE_OPTIONS.filter((resource) => resource.categories.includes(category))
+          if (!options.length) return null
+          const selectedItems = form.requestedItemsByCategory[category] || {}
+          return (
+            <fieldset key={`requested-${category}`} className="rise mt-5">
+              <legend className="mb-2 text-sm font-bold text-slate-700">
+                Choose {category.toLowerCase()} supplies and quantities
+              </legend>
+              <div className="space-y-2">
+                {options.map((resource) => {
+                  const selected = Object.hasOwn(selectedItems, resource.code)
+                  return (
+                    <div key={resource.code} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                      <label className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={(event) => toggleRequestedResource(category, resource.code, event.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                        />
+                        <span>{resource.name}</span>
+                      </label>
+                      {selected && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            aria-label={`${resource.name} requested quantity`}
+                            type="number"
+                            min="0.001"
+                            step="0.001"
+                            inputMode="decimal"
+                            value={selectedItems[resource.code]}
+                            onChange={(event) => {
+                              const value = event.target.value
+                              if (value === '' || /^\d{0,11}(?:\.\d{0,3})?$/.test(value)) {
+                                updateRequestedQuantity(category, resource.code, value)
+                              }
+                            }}
+                            className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                            placeholder="Quantity"
+                          />
+                          <span className="text-sm text-slate-500">{resource.unit}</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              <FieldError id={`err-items-${category}`} message={errors[`items-${category}`]} />
+            </fieldset>
+          )
+        })}
 
         {form.categories.filter((category) => DETAILS[category]).map((category) => {
           const detailsCfg = DETAILS[category]

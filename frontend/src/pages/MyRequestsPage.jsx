@@ -15,6 +15,7 @@ export default function MyRequestsPage({ requests, goTo }) {
               <div>
                 <p className="font-semibold text-slate-900">{r.type} <span className="font-normal text-slate-400">· {r.id}</span></p>
                 <p className="text-sm text-slate-500">{r.location} · {r.time}</p>
+                {r.supplies?.length > 0 && <p className="mt-1 text-xs text-slate-500">{r.supplies.join(' · ')}</p>}
               </div>
               <Badge value={r.status} />
             </div>

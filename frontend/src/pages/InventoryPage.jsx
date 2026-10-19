@@ -6,6 +6,23 @@ import { supabase } from '../services/supabase'
 
 const inputClass = 'w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-100'
 
+function mapInventoryRows(rows) {
+  return rows.map((row) => {
+    const resource = Array.isArray(row.resource) ? row.resource[0] : row.resource
+    const quantity = Number(row.quantity)
+    const available = Math.max(0, quantity - Number(row.reserved_quantity))
+    const progress = quantity > 0 ? Math.round((available / quantity) * 100) : 0
+    return {
+      id: row.id,
+      item: resource?.name || 'Unknown resource',
+      available,
+      unit: resource?.unit || 'units',
+      progress,
+      state: progress <= 15 ? 'Low' : progress <= 40 ? 'Watch' : 'Healthy',
+    }
+  })
+}
+
 export default function InventoryPage({ data }) {
   const { user } = useAuth()
   const [items, setItems] = useState(data.inventory)
@@ -25,7 +42,7 @@ export default function InventoryPage({ data }) {
     const loadOptions = async () => {
       setLoading(true)
       const [membershipResult, catalogResult] = await Promise.allSettled([
-        supabase.from('ngo_memberships').select('partner_id').eq('profile_id', user.id).eq('status', 'active'),
+        supabase.from('ngo_memberships').select('partner_id').eq('profile_id', user.id).eq('status', 'active').order('created_at'),
         supabase.from('resource_catalog').select('id, name, unit').order('name'),
       ])
       if (cancelled) return
@@ -57,12 +74,63 @@ export default function InventoryPage({ data }) {
         loadErrors.push(`Could not load resource options: ${message}`)
       }
 
+      const activePartnerId = membershipResult.status === 'fulfilled' && !membershipResult.value.error
+        ? membershipResult.value.data?.[0]?.partner_id || ''
+        : ''
+      if (activePartnerId) {
+        const { data: inventoryRows, error: inventoryError } = await supabase
+          .from('inventory')
+          .select('id, quantity, reserved_quantity, resource:resource_catalog(name, unit)')
+          .eq('partner_id', activePartnerId)
+          .is('centre_id', null)
+          .order('updated_at', { ascending: false })
+        if (cancelled) return
+        if (inventoryError) {
+          loadErrors.push(`Could not refresh inventory: ${inventoryError.message}`)
+        } else {
+          setItems(mapInventoryRows(inventoryRows || []))
+        }
+      } else {
+        setItems([])
+      }
+
       setOptionsError(loadErrors.join(' '))
       setLoading(false)
     }
     loadOptions()
     return () => { cancelled = true }
   }, [user.id, optionsRetry])
+
+  useEffect(() => {
+    if (!partnerId) return undefined
+    let cancelled = false
+    const refreshInventory = async () => {
+      const { data: inventoryRows, error: inventoryError } = await supabase
+        .from('inventory')
+        .select('id, quantity, reserved_quantity, resource:resource_catalog(name, unit)')
+        .eq('partner_id', partnerId)
+        .is('centre_id', null)
+        .order('updated_at', { ascending: false })
+      if (cancelled) return
+      if (inventoryError) {
+        setError(`Could not refresh inventory: ${inventoryError.message}`)
+        return
+      }
+      setItems(mapInventoryRows(inventoryRows || []))
+    }
+    const channel = supabase.channel(`ngo-inventory-sync-${partnerId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inventory',
+        filter: `partner_id=eq.${partnerId}`,
+      }, refreshInventory)
+      .subscribe()
+    return () => {
+      cancelled = true
+      supabase.removeChannel(channel)
+    }
+  }, [partnerId])
 
   const saveStock = async (event) => {
     event.preventDefault()

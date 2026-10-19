@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext'
 import BrandLogo from './components/BrandLogo'
 import { getDashboardData } from './services/reliefApi'
 import { getNotifications } from './services/notificationsApi'
+import { supabase } from './services/supabase'
 import AuthPage from './pages/AuthPage'
 import OverviewPage from './pages/OverviewPage'
 import RequestsPage from './pages/RequestsPage'
@@ -69,6 +70,35 @@ export default function App() {
       .then((dashboardData) => { if (!cancelled) setData(dashboardData) })
       .catch((error) => { if (!cancelled) setDataError(error.message) })
     return () => { cancelled = true }
+  }, [user])
+  useEffect(() => {
+    if (!user) return undefined
+    let cancelled = false
+    let refreshTimer
+    const refreshDashboard = () => {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = window.setTimeout(() => {
+        getDashboardData(user)
+          .then((dashboardData) => {
+            if (cancelled) return
+            setData(dashboardData)
+            setDataError('')
+          })
+          .catch((error) => {
+            if (!cancelled) setDataError(error.message)
+          })
+      }, 250)
+    }
+    const channel = supabase.channel(`dashboard-sync-${user.id}`)
+    for (const table of ['assistance_requests', 'inventory', 'allocations', 'allocation_items', 'deliveries']) {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, refreshDashboard)
+    }
+    channel.subscribe()
+    return () => {
+      cancelled = true
+      window.clearTimeout(refreshTimer)
+      supabase.removeChannel(channel)
+    }
   }, [user])
   useEffect(() => { setActive('Overview'); setNotice(''); setMenuOpen(false) }, [user?.id])
   useEffect(() => {
