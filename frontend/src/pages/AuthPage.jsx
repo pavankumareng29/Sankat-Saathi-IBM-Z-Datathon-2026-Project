@@ -161,6 +161,45 @@ const OrDivider = () => (
 )
 
 /* ------------------------------------------------------------------ */
+/*  Demo accounts so hackathon judges can test every role              */
+/*  (delete this block and <DemoCredentials /> after the hackathon)    */
+/* ------------------------------------------------------------------ */
+
+const DEMO_ACCOUNTS = [
+  { role: 'Admin login', icon: ShieldCheck, tint: 'bg-blue-100 text-blue-600', email: 'pavankumar.eng29@gmail.com', password: 'demo123123' },
+  { role: 'NGO login', icon: Building2, tint: 'bg-emerald-100 text-emerald-600', email: 'ngo@mail.com', password: 'NGO@0808' },
+  { role: 'Citizen / Public login', icon: User, tint: 'bg-orange-100 text-orange-500', email: 'public@gmail.com', password: 'PUBLIC0808' },
+]
+
+function DemoCredentials() {
+  return (
+    <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-3.5">
+      <p className="mb-2.5 flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-[.14em] text-slate-800">
+        <KeyRound size={13} aria-hidden="true" /> Demo logins for judges
+      </p>
+      <ul className="space-y-2">
+        {DEMO_ACCOUNTS.map(({ role, icon: Icon, tint, email, password }) => (
+          <li key={role} className="flex items-start gap-3 rounded-xl bg-white p-2.5 ring-1 ring-slate-200">
+            <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tint}`}>
+              <Icon size={16} aria-hidden="true" />
+            </span>
+            <div className="min-w-0 text-xs leading-snug">
+              <p className="text-sm font-bold text-[#0b1b3a]">{role}</p>
+              <p className="mt-0.5 break-all font-medium text-slate-700">
+                Email: <span className="select-all font-semibold text-slate-900">{email}</span>
+              </p>
+              <p className="font-medium text-slate-700">
+                Password: <span className="select-all font-semibold text-slate-900">{password}</span>
+              </p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Views (auth logic unchanged)                                       */
 /* ------------------------------------------------------------------ */
 
@@ -192,6 +231,7 @@ function LoginView({ go, email: initialEmail, notice }) {
       <Submit busy={busy}>Log in</Submit>
       <OrDivider />
       <p className="text-center text-sm text-slate-600">New here? <LinkBtn onClick={() => go('register')}>Create an account</LinkBtn></p>
+      <DemoCredentials />
     </form>
   )
 }
